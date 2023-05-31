@@ -3,14 +3,26 @@
 import { BsGithub, BsGoogle } from 'react-icons/bs';
 import Button from "@/app/components/buttons/Button";
 import { Input } from "@/app/components/inputs/Input";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useForm, FieldValues, SubmitHandler } from "react-hook-form";
 import AuthSocialButton from "./AuthSocialButton";
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
+import { signIn, useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 type Variant = 'LOGIN' | 'REGISTER';
 const AuthForm = () => {
     const [variant, setVariant] = useState<Variant>('LOGIN');
     const [isLoading, setIsLoading] = useState(false);
+    const session = useSession();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (session?.status === 'authenticated') {
+            router.push('/users');
+        }
+    }, [session?.status, router])
 
     const toogleVariant = useCallback(() => {
         if (variant === 'LOGIN') {
@@ -35,14 +47,42 @@ const AuthForm = () => {
         setIsLoading(true);
         if (variant === "REGISTER") {
             // axios regiseter
+            axios.post('/api/register', data)
+                .then(() => signIn('credentials', data))
+                .catch((e) => toast.error('Something went wrong!'))
+                .finally(() => setIsLoading(false));
         }
         if (variant === "LOGIN") {
             // nexxt auth signIn
+            signIn('credentials', {
+                ...data,
+                redirect: false,
+            })
+                .then(cb => {
+                    if (cb?.error) {
+                        toast.error('Invalid credentials');
+                    }
+                    if (cb?.ok && !cb?.error) {
+                        toast.success('Logged in!');
+                        router.push('/users');
+                    }
+                })
+                .finally(() => setIsLoading(false))
         }
     };
 
     const socialAction = (action: string) => {
         setIsLoading(true);
+        signIn(action, { redirect: false })
+            .then(cb => {
+                if (cb?.error) {
+                    toast.error('Invalid credentials');
+                }
+                if (cb?.ok && !cb?.error) {
+                    toast.success('Logged in!');
+                }
+            })
+            .finally(() => setIsLoading(false))
     };
 
     return (
@@ -51,11 +91,11 @@ const AuthForm = () => {
                 <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
                     {
                         variant === "REGISTER" && (
-                            <Input id="name" label="Name" register={register} errors={errors} disabled={isLoading}/>
+                            <Input id="name" label="Name" register={register} errors={errors} disabled={isLoading} />
                         )
                     }
-                    <Input id="email" label="Email address" register={register} errors={errors} disabled={isLoading}/>
-                    <Input id="password" label="Password" register={register} errors={errors} disabled={isLoading}/>
+                    <Input id="email" label="Email address" register={register} errors={errors} disabled={isLoading} />
+                    <Input id="password" label="Password" type={'password'} register={register} errors={errors} disabled={isLoading} />
                     <div className="">
                         <Button
                             disabled={isLoading}
